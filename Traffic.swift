@@ -64,6 +64,8 @@ struct TrafficRow: Identifiable {
     var minute: Int64
     var connection, started, process, host, node, network, rule: String
     var upload, download: Int64
+    var totalBytes: Int64 { upload + download }
+    var totalMegabytes: Decimal { Decimal(totalBytes) / 1_000_000 }
     var id: String { "\(minute)/\(connection)" }
     var date: Date { Date(timeIntervalSince1970: Double(minute)) }
 }

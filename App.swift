@@ -135,14 +135,18 @@ final class MonitorModel: ObservableObject {
         defer { try? FileManager.default.removeItem(at: temporary) }
         let file = try FileHandle(forWritingTo: temporary)
         defer { try? file.close() }
-        try file.write(contentsOf: Data("\u{FEFF}采集分钟,连接开始时间,连接ID,进程,域名,出口节点,协议,规则,上行字节,下行字节,总字节\r\n".utf8))
+        try file.write(contentsOf: Data("\u{FEFF}采集分钟,连接开始时间,连接ID,进程,域名,出口节点,协议,规则,上行字节,下行字节,总字节,合计 MB\r\n".utf8))
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
+        let megabytesFormat = Decimal.FormatStyle.number
+            .precision(.fractionLength(6))
+            .grouping(.never)
+            .locale(Locale(identifier: "en_US_POSIX"))
         var buffer = Data()
         try store.read(filter, limit: -1) { row in
             let fields = [formatter.string(from: row.date), row.started, row.connection, row.process,
                           row.host, row.node, row.network, row.rule].map(csvText)
-                + [String(row.upload), String(row.download), String(row.upload + row.download)]
+                + [String(row.upload), String(row.download), String(row.totalBytes), row.totalMegabytes.formatted(megabytesFormat)]
             buffer.append(contentsOf: (fields.joined(separator: ",") + "\r\n").utf8)
             if buffer.count >= 64 * 1024 {
                 try file.write(contentsOf: buffer)
@@ -187,7 +191,11 @@ struct DetailView: View {
                 TableColumn("规则", value: \.rule).width(min: 80, ideal: 110)
                 TableColumn("上行 B") { row in Text(row.upload.formatted()).monospacedDigit() }.width(82)
                 TableColumn("下行 B") { row in Text(row.download.formatted()).monospacedDigit() }.width(82)
-                TableColumn("合计 B") { row in Text((row.upload + row.download).formatted()).monospacedDigit() }.width(82)
+                TableColumn("合计 B") { row in Text(row.totalBytes.formatted()).monospacedDigit() }.width(82)
+                TableColumn("合计 MB") { row in
+                    Text(row.totalMegabytes.formatted(.number.precision(.fractionLength(6))))
+                        .monospacedDigit()
+                }.width(100)
             }
             HStack {
                 Text(filter.end <= filter.start ? "结束时间必须晚于开始时间" : model.queryStatus)
